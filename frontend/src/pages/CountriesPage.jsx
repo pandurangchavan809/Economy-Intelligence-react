@@ -4,7 +4,7 @@ import { apiGet, apiPost, peekApiCache } from "../api";
 import MetricCard from "../components/MetricCard";
 import SectionHeading from "../components/SectionHeading";
 import { useLiveMetric } from "../hooks/useLiveMetric";
-import { formatBillions, formatNumber, formatPercent, formatTrillions, formatUsd } from "../utils/formatters";
+import { formatBillions, formatCompactUsd, formatLiveGdp, formatNumber, formatPercent, formatTrillions, formatUsd } from "../utils/formatters";
 
 function getInitialCountryId() {
   const cached = peekApiCache("/countries") || [];
@@ -134,7 +134,7 @@ export default function CountriesPage() {
         <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
           <MetricCard
             label="Live GDP"
-            value={liveGdp ? formatTrillions(liveGdp, 6) : "Loading..."}
+            value={liveGdp ? formatLiveGdp(liveGdp) : "Loading..."}
             hint="Current USD"
             valueClassName="text-[clamp(1.45rem,2.25vw,2.6rem)]"
           />
@@ -188,7 +188,7 @@ export default function CountriesPage() {
               label="Military Spending"
               value={formatBillions(detail?.metrics?.militarySpendingUsd)}
             />
-            <MetricCard label="Base GDP" value={formatTrillions(detail?.live?.gdp?.baseValue)} />
+            <MetricCard label="Base GDP" value={formatCompactUsd(detail?.live?.gdp?.baseValue)} />
           </div>
         </div>
 

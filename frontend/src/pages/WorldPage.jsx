@@ -4,7 +4,7 @@ import { apiGet, peekApiCache } from "../api";
 import MetricCard from "../components/MetricCard";
 import SectionHeading from "../components/SectionHeading";
 import { useLiveMetric } from "../hooks/useLiveMetric";
-import { formatNumber, formatPercent, formatTrillions, formatUsd } from "../utils/formatters";
+import { formatCompactUsd, formatLiveGdp, formatNumber, formatPercent, formatTrillions, formatUsd } from "../utils/formatters";
 
 export default function WorldPage() {
   const [world, setWorld] = useState(() => peekApiCache("/world"));
@@ -32,15 +32,15 @@ export default function WorldPage() {
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Live GDP"
-          value={liveGdp ? formatTrillions(liveGdp, 6) : "Loading..."}
+          value={liveGdp ? formatLiveGdp(liveGdp) : "Loading..."}
           hint="Current USD, updated every second"
-          valueClassName="text-[clamp(1.15rem,1.7vw,2.1rem)] leading-[1.05] tracking-tight"
+          valueClassName="text-[clamp(1rem,1.45vw,1.8rem)] leading-[1.05] tracking-tight"
         />
         <MetricCard
           label="Population"
           value={livePopulation ? formatNumber(livePopulation) : "Loading..."}
           hint="Live estimate from stored growth rate"
-          valueClassName="text-[clamp(1.1rem,1.65vw,2rem)] leading-[1.05] tracking-tight"
+          valueClassName="text-[clamp(0.98rem,1.35vw,1.65rem)] leading-[1.05] tracking-tight"
         />
         <MetricCard
           label="GDP Per Capita"
@@ -72,11 +72,13 @@ export default function WorldPage() {
             />
             <MetricCard
               label={`Base GDP ${world?.stats?.baseGdpYear || ""}`}
-              value={world ? formatTrillions(world.live?.gdp?.baseValue) : "Loading..."}
+              value={world ? formatCompactUsd(world.live?.gdp?.baseValue) : "Loading..."}
+              valueClassName="text-[clamp(1.05rem,1.5vw,1.9rem)] leading-[1.05] tracking-tight"
             />
             <MetricCard
               label={`Base Population ${world?.stats?.basePopulationYear || ""}`}
               value={world ? formatNumber(world.live?.population?.baseValue) : "Loading..."}
+              valueClassName="text-[clamp(0.98rem,1.35vw,1.65rem)] leading-[1.05] tracking-tight"
             />
           </div>
         </div>
@@ -85,7 +87,7 @@ export default function WorldPage() {
           <SectionHeading
             eyebrow="Trade"
             title="Global trade balance"
-            text="Trade is shown from the latest stored year in your Aiven database."
+            text="Trade reflects the latest available year in the dataset."
           />
           <div className="space-y-4">
             <div className="rounded-[1.5rem] bg-mist p-4">

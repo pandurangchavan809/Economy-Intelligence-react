@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { apiGet, peekApiCache } from "../api";
 import MetricCard from "../components/MetricCard";
 import SectionHeading from "../components/SectionHeading";
-import { formatNumber, formatPercent, formatTrillions } from "../utils/formatters";
+import { useLiveMetric } from "../hooks/useLiveMetric";
+import { formatCompactUsd, formatLiveGdp, formatNumber, formatPercent } from "../utils/formatters";
 
 export default function HomePage() {
   const [world, setWorld] = useState(() => peekApiCache("/world"));
@@ -14,6 +15,9 @@ export default function HomePage() {
     apiGet("/world").then(setWorld).catch(() => {});
     apiGet("/continents").then(setContinents).catch(() => {});
   }, []);
+
+  const liveWorldGdp = useLiveMetric(world?.live?.gdp, "nominal");
+  const liveWorldPopulation = useLiveMetric(world?.live?.population, "population");
 
   return (
     <div className="space-y-12 pb-10">
@@ -69,13 +73,15 @@ export default function HomePage() {
         <div className="grid gap-5 md:grid-cols-3">
           <MetricCard
             label="World GDP"
-            value={world ? formatTrillions(world.live?.gdp?.currentValue, 3) : "Loading..."}
+            value={liveWorldGdp ? formatLiveGdp(liveWorldGdp) : "Loading..."}
             hint={world ? `Base year ${world.stats?.baseGdpYear}` : "Waiting for API"}
+            valueClassName="text-[clamp(1rem,1.45vw,1.75rem)] leading-[1.05] tracking-tight"
           />
           <MetricCard
             label="World Population"
-            value={world ? formatNumber(world.live?.population?.currentValue) : "Loading..."}
+            value={liveWorldPopulation ? formatNumber(liveWorldPopulation) : "Loading..."}
             hint="Live population math from stored baselines"
+            valueClassName="text-[clamp(0.98rem,1.35vw,1.6rem)] leading-[1.05] tracking-tight"
           />
           <MetricCard
             label="Nominal Growth"
@@ -105,7 +111,7 @@ export default function HomePage() {
           <SectionHeading
             eyebrow="Coverage"
             title="Continent snapshot"
-            text="A compact regional view so the landing page already feels market-ready."
+            text="Regional GDP, population, and global share at a glance."
           />
           <div className="grid gap-4 md:grid-cols-2">
             {continents.slice(0, 4).map((continent) => (
@@ -122,7 +128,7 @@ export default function HomePage() {
                   </span>
                 </div>
                 <p className="mt-4 text-xl font-semibold tabular-nums text-ink">
-                  {formatTrillions(continent.liveGdpUsd)}
+                  {formatCompactUsd(continent.liveGdpUsd)}
                 </p>
                 <p className="mt-1 text-sm text-ink/60">
                   Population {formatNumber(continent.livePopulation)}

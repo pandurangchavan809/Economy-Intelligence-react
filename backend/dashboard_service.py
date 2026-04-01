@@ -235,46 +235,25 @@ def get_continent_detail(continent_code):
     items = get_continent_list()
     selected = next((item for item in items if item["code"] == continent_code), None)
 
-    top_countries = []
-    if table_has_column("continent_country_gdp_share", "continent_code"):
-        latest_year_row = fetch_one(
-            """
-            SELECT MAX(year) AS year
-            FROM continent_country_gdp_share
-            WHERE continent_code = %s
-            """,
-            (continent_code,),
-        )
-        latest_year = latest_year_row.get("year") if latest_year_row else None
-        if latest_year:
-            top_countries = fetch_all(
-                """
-                SELECT country, gdp, pct_of_continent, year
-                FROM continent_country_gdp_share
-                WHERE continent_code = %s AND year = %s
-                ORDER BY gdp DESC
-                LIMIT 7
-                """,
-                (continent_code, latest_year),
-            )
-
-    if not top_countries:
-        top_countries = fetch_all(
-            """
-            SELECT c.name AS country, ei.gdp, NULL AS pct_of_continent, ei.year
-            FROM countries c
-            JOIN economic_indicators ei ON ei.country_id = c.country_id
-            WHERE c.continent_code = %s
-              AND ei.year = (
-                  SELECT MAX(ei2.year)
-                  FROM economic_indicators ei2
-                  WHERE ei2.country_id = c.country_id
-              )
-            ORDER BY ei.gdp DESC
-            LIMIT 7
-            """,
-            (continent_code,),
-        )
+    top_countries = fetch_all(
+        """
+        SELECT c.name AS country, ei.gdp, ei.gdp_growth, ei.inflation, ei.year
+        FROM countries c
+        JOIN (
+            SELECT country_id, MAX(year) AS year
+            FROM economic_indicators
+            GROUP BY country_id
+        ) latest ON latest.country_id = c.country_id
+        JOIN economic_indicators ei
+          ON ei.country_id = latest.country_id
+         AND ei.year = latest.year
+        WHERE c.continent_code = %s
+          AND ei.gdp IS NOT NULL
+        ORDER BY ei.gdp DESC
+        LIMIT 7
+        """,
+        (continent_code,),
+    )
 
     return {
         "continent": selected,
@@ -282,7 +261,25 @@ def get_continent_detail(continent_code):
             {
                 "country": row.get("country"),
                 "gdpUsd": clean_number(row.get("gdp")),
-                "shareOfContinent": clean_number(row.get("pct_of_continent")),
+                "liveGdpUsd": live_nominal_value(
+                    row.get("gdp"),
+                    row.get("gdp_growth"),
+                    row.get("inflation"),
+                    (int(row["year"]) + 1) if row.get("year") else utc_year(),
+                ) if row.get("gdp") is not None else None,
+                "shareOfContinent": (
+                    (
+                        live_nominal_value(
+                            row.get("gdp"),
+                            row.get("gdp_growth"),
+                            row.get("inflation"),
+                            (int(row["year"]) + 1) if row.get("year") else utc_year(),
+                        )
+                        / selected["liveGdpUsd"]
+                    ) * 100
+                    if selected and selected.get("liveGdpUsd") and row.get("gdp") is not None
+                    else None
+                ),
                 "year": int(row["year"]) if row.get("year") else None,
             }
             for row in top_countries

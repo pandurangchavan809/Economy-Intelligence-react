@@ -4,7 +4,7 @@ import { apiGet, peekApiCache } from "../api";
 import MetricCard from "../components/MetricCard";
 import SectionHeading from "../components/SectionHeading";
 import { useLiveMetric } from "../hooks/useLiveMetric";
-import { formatNumber, formatPercent, formatTrillions } from "../utils/formatters";
+import { formatCompactUsd, formatLiveGdp, formatNumber, formatPercent, formatTrillions } from "../utils/formatters";
 
 function getInitialContinentCode() {
   const cached = peekApiCache("/continents") || [];
@@ -14,6 +14,7 @@ function getInitialContinentCode() {
 export default function ContinentsPage() {
   const [continents, setContinents] = useState(() => peekApiCache("/continents") || []);
   const [selectedCode, setSelectedCode] = useState(() => getInitialContinentCode());
+  const [world, setWorld] = useState(() => peekApiCache("/world"));
   const [detail, setDetail] = useState(() => {
     const code = getInitialContinentCode();
     return code ? peekApiCache(`/continents/${code}`) : null;
@@ -32,6 +33,12 @@ export default function ContinentsPage() {
   }, [selectedCode]);
 
   useEffect(() => {
+    apiGet("/world")
+      .then(setWorld)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!selectedCode) return;
     apiGet(`/continents/${selectedCode}`)
       .then(setDetail)
@@ -45,6 +52,8 @@ export default function ContinentsPage() {
 
   const liveGdp = useLiveMetric(selectedContinent?.liveConfig?.gdp, "nominal");
   const livePopulation = useLiveMetric(selectedContinent?.liveConfig?.population, "population");
+  const liveWorldGdp = useLiveMetric(world?.live?.gdp, "nominal");
+  const shareOfWorld = liveGdp && liveWorldGdp ? (liveGdp / liveWorldGdp) * 100 : selectedContinent?.shareOfWorld;
 
   return (
     <div className="space-y-8 pb-10">
@@ -74,7 +83,7 @@ export default function ContinentsPage() {
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Live GDP"
-          value={liveGdp ? formatTrillions(liveGdp, 5) : "Loading..."}
+          value={liveGdp ? formatLiveGdp(liveGdp) : "Loading..."}
           hint={selectedContinent ? selectedContinent.name : "Select a continent"}
           valueClassName="text-[clamp(1.1rem,1.55vw,1.95rem)] leading-[1.05] tracking-tight"
         />
@@ -86,8 +95,8 @@ export default function ContinentsPage() {
         />
         <MetricCard
           label="Share of World"
-          value={selectedContinent ? formatPercent(selectedContinent.shareOfWorld) : "Loading..."}
-          hint="Latest stored GDP share"
+          value={selectedContinent ? formatPercent(shareOfWorld) : "Loading..."}
+          hint="Computed from current live GDP values"
         />
         <MetricCard
           label="GDP Per Capita"
@@ -122,7 +131,7 @@ export default function ContinentsPage() {
                 {continents.map((continent) => (
                   <tr key={continent.code}>
                     <td>{continent.name}</td>
-                    <td>{formatTrillions(continent.liveGdpUsd, 3)}</td>
+                    <td>{formatCompactUsd(continent.liveGdpUsd)}</td>
                     <td>{formatNumber(continent.livePopulation)}</td>
                     <td>{formatPercent(continent.realGrowth)}</td>
                     <td>{formatPercent(continent.inflation)}</td>
@@ -137,7 +146,7 @@ export default function ContinentsPage() {
           <SectionHeading
             eyebrow="Detail"
             title={selectedContinent?.name || "Selected continent"}
-            text="Top contributing countries and trade snapshot."
+            text="Leading economies and trade signals for the selected region."
           />
           <div className="grid gap-4 sm:grid-cols-2">
             <MetricCard
@@ -169,9 +178,13 @@ export default function ContinentsPage() {
                   <p className="text-sm text-ink/60">Year {country.year || "Latest"}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-ink">{formatTrillions(country.gdpUsd)}</p>
+                  <p className="font-semibold text-ink">
+                    {formatCompactUsd(country.liveGdpUsd ?? country.gdpUsd)}
+                  </p>
                   <p className="text-sm text-ink/60">
-                    {country.shareOfContinent ? formatPercent(country.shareOfContinent) : "Share n/a"}
+                    {country.shareOfContinent !== null && country.shareOfContinent !== undefined
+                      ? formatPercent(country.shareOfContinent)
+                      : "Share n/a"}
                   </p>
                 </div>
               </div>
