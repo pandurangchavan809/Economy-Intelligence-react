@@ -1,7 +1,9 @@
 import re
 from functools import lru_cache
+from threading import Lock
 
 import mysql.connector
+from mysql.connector import pooling
 
 try:
     from .config import Config
@@ -10,17 +12,43 @@ except ImportError:
 
 
 IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_POOL_LOCK = Lock()
+_CONNECTION_POOL = None
+
+
+def _get_connection_kwargs():
+    return {
+        "host": Config.DB_HOST,
+        "port": Config.DB_PORT,
+        "user": Config.DB_USER,
+        "password": Config.DB_PASSWORD,
+        "database": Config.DB_NAME,
+        "ssl_disabled": Config.DB_SSL_DISABLED,
+        "connection_timeout": Config.DB_CONNECTION_TIMEOUT,
+    }
+
+
+def _get_connection_pool():
+    global _CONNECTION_POOL
+
+    if _CONNECTION_POOL is None:
+        with _POOL_LOCK:
+            if _CONNECTION_POOL is None:
+                _CONNECTION_POOL = pooling.MySQLConnectionPool(
+                    pool_name=Config.DB_POOL_NAME,
+                    pool_size=Config.DB_POOL_SIZE,
+                    pool_reset_session=True,
+                    **_get_connection_kwargs(),
+                )
+
+    return _CONNECTION_POOL
 
 
 def get_connection():
-    return mysql.connector.connect(
-        host=Config.DB_HOST,
-        port=Config.DB_PORT,
-        user=Config.DB_USER,
-        password=Config.DB_PASSWORD,
-        database=Config.DB_NAME,
-        ssl_disabled=Config.DB_SSL_DISABLED,
-    )
+    try:
+        return _get_connection_pool().get_connection()
+    except Exception:
+        return mysql.connector.connect(**_get_connection_kwargs())
 
 
 def fetch_one(query, params=None):

@@ -51,6 +51,9 @@ class Config:
     DB_PASSWORD = os.getenv("DB_PASSWORD", "")
     DB_NAME = os.getenv("DB_NAME", "economy_intelligence")
     DB_SSL_DISABLED = _as_bool(os.getenv("DB_SSL_DISABLED"), default=False)
+    DB_POOL_NAME = os.getenv("DB_POOL_NAME", "economy_intelligence_pool")
+    DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "5"))
+    DB_CONNECTION_TIMEOUT = int(os.getenv("DB_CONNECTION_TIMEOUT", "5"))
 
     FRONTEND_ORIGIN = _normalize_origin(os.getenv("FRONTEND_ORIGIN", "http://localhost:5173"))
     FRONTEND_ORIGINS = _unique(
@@ -70,3 +73,6 @@ class Config:
 
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    FX_API_URL = os.getenv("FX_API_URL", "https://api.exchangerate-api.com/v4/latest/USD")
+    FX_REQUEST_TIMEOUT_SECONDS = int(os.getenv("FX_REQUEST_TIMEOUT_SECONDS", "3"))
+    FX_CACHE_TTL_SECONDS = int(os.getenv("FX_CACHE_TTL_SECONDS", "21600"))
