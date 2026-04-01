@@ -12,6 +12,34 @@ def _as_bool(value, default=False):
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _normalize_origin(value):
+    if value is None:
+        return None
+
+    normalized = str(value).strip().rstrip("/")
+    return normalized or None
+
+
+def _split_csv(value):
+    if not value:
+        return []
+
+    return [item for item in (_normalize_origin(part) for part in value.split(",")) if item]
+
+
+def _unique(values):
+    seen = set()
+    items = []
+
+    for value in values:
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        items.append(value)
+
+    return items
+
+
 class Config:
     DEBUG = _as_bool(os.getenv("FLASK_DEBUG"), default=True)
     HOST = os.getenv("FLASK_HOST", "0.0.0.0")
@@ -24,7 +52,16 @@ class Config:
     DB_NAME = os.getenv("DB_NAME", "economy_intelligence")
     DB_SSL_DISABLED = _as_bool(os.getenv("DB_SSL_DISABLED"), default=False)
 
-    FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+    FRONTEND_ORIGIN = _normalize_origin(os.getenv("FRONTEND_ORIGIN", "http://localhost:5173"))
+    FRONTEND_ORIGINS = _unique(
+        [
+            *_split_csv(os.getenv("FRONTEND_ORIGINS")),
+            FRONTEND_ORIGIN,
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "https://economic-intelligence.vercel.app",
+        ]
+    )
 
     ADMIN_ID = os.getenv("ADMIN_ID", "admin")
     ADMIN_PASS = os.getenv("ADMIN_PASS", "admin123")

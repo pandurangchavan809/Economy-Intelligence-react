@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from werkzeug.exceptions import HTTPException
 
 try:
     from .admin_service import (
@@ -34,7 +35,13 @@ except ImportError:
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
-    CORS(app, origins=[Config.FRONTEND_ORIGIN, "http://127.0.0.1:5173"], supports_credentials=True)
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": Config.FRONTEND_ORIGINS}},
+        supports_credentials=True,
+        allow_headers=["Authorization", "Content-Type"],
+        methods=["GET", "POST", "OPTIONS"],
+    )
 
     @app.get("/api/health")
     def health():
@@ -149,6 +156,8 @@ def create_app():
 
     @app.errorhandler(Exception)
     def handle_error(error):
+        if isinstance(error, HTTPException):
+            return jsonify({"error": error.description or error.name}), error.code
         return jsonify({"error": str(error)}), 500
 
     return app

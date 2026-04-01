@@ -29,7 +29,7 @@ function InsightChart({ title, subtitle, items, field, color, type = "line", suf
   const padding = 20;
   const values = items.map((item) => Number(item[field] || 0));
   const linePath = buildLinePath(values, width, height, padding);
-  const max = Math.max(...values, 1);
+  const max = Math.max(...values.map((value) => Math.max(value, 0)), 1);
 
   return (
     <div className="panel">
@@ -56,9 +56,10 @@ function InsightChart({ title, subtitle, items, field, color, type = "line", suf
 
         {type === "bar"
           ? values.map((value, index) => {
-              const barWidth = (width - padding * 2) / Math.max(values.length, 1) - 8;
+              const barWidth = Math.max((width - padding * 2) / Math.max(values.length, 1) - 8, 0);
               const x = padding + index * ((width - padding * 2) / Math.max(values.length, 1)) + 4;
-              const barHeight = ((height - padding * 2) * value) / max;
+              const safeValue = Math.max(value, 0);
+              const barHeight = Math.max(((height - padding * 2) * safeValue) / max, 0);
               const y = height - padding - barHeight;
 
               return (
