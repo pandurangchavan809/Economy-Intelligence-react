@@ -30,7 +30,7 @@ def fetch_one(query, params=None):
 
 def fetch_all(query, params=None):
     connection = get_connection()
-    cursor = connection.cursor(dictionary=True)
+    cursor = connection.cursor(dictionary=True, buffered=True)
     try:
         cursor.execute(query, params or ())
         return cursor.fetchall()

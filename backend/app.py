@@ -55,7 +55,7 @@ def create_app():
     def continents():
         return jsonify(get_continent_list())
 
-    @app.get("/api/continents/<continent_code>")
+    @app.get("/api/continents/<string:continent_code>")
     def continent_detail(continent_code):
         detail = get_continent_detail(continent_code.upper())
         if not detail:

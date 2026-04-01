@@ -8,6 +8,43 @@ except ImportError:
     from live_math import live_nominal_value, live_population_value
 
 
+def _map_rows(rows, key="continent_code"):
+    return {row[key]: row for row in rows if row.get(key) is not None}
+
+
+def _fetch_latest_continent_rows(table_name, value_columns):
+    columns = list(value_columns)
+    has_year = table_has_column(table_name, "year")
+
+    if has_year:
+        selected_columns = ", ".join(
+            [f"t.continent_code"] + [f"t.{column}" for column in columns] + ["t.year"]
+        )
+        return fetch_all(
+            f"""
+            SELECT {selected_columns}
+            FROM {table_name} t
+            JOIN (
+                SELECT continent_code, MAX(year) AS year
+                FROM {table_name}
+                GROUP BY continent_code
+            ) latest
+              ON latest.continent_code = t.continent_code
+             AND latest.year = t.year
+            """
+        )
+
+    selected_columns = ", ".join(["continent_code"] + columns)
+    return fetch_all(f"SELECT {selected_columns} FROM {table_name}")
+
+
+def _safe_continent_map(table_name, value_columns):
+    try:
+        return _map_rows(_fetch_latest_continent_rows(table_name, value_columns))
+    except Exception:
+        return {}
+
+
 def get_world_overview():
     gdp_row = get_table_row("global_nominal_gdp", "gdp_usd, year")
     population_row = get_table_row("global_population", "population, year")
@@ -87,63 +124,34 @@ def get_world_overview():
 
 def get_continent_list():
     continents = fetch_all("SELECT code, name FROM continents WHERE code <> 'AN' ORDER BY name")
-    growth_has_year = table_has_column("continent_real_gdp_growth", "year")
-    inflation_has_year = table_has_column("continent_inflation", "year")
-    pop_growth_has_year = table_has_column("continent_population_growth", "year")
-    share_has_year = table_has_column("continent_world_gdp_share", "year")
+    gdp_rows = _safe_continent_map("continent_nominal_gdp", ["gdp_usd"])
+    population_rows = _safe_continent_map("continent_population", ["population"])
+    trade_rows = _safe_continent_map(
+        "continent_trade",
+        ["exports_usd", "imports_usd", "trade_balance_usd"],
+    )
+    gdp_per_capita_rows = _safe_continent_map("continent_gdp_per_capita", ["gdp_per_capita_usd"])
+    growth_rows = _safe_continent_map("continent_real_gdp_growth", ["real_growth"])
+    inflation_rows = _safe_continent_map("continent_inflation", ["inflation"])
+    pop_growth_rows = _safe_continent_map("continent_population_growth", ["growth_rate"])
+    share_rows = _safe_continent_map("continent_world_gdp_share", ["pct_of_world"])
 
     items = []
 
     for continent in continents:
         code = continent["code"]
-        gdp_row = get_table_row(
-            "continent_nominal_gdp",
-            "gdp_usd, year",
-            filters={"continent_code": code},
-        )
-        pop_row = get_table_row(
-            "continent_population",
-            "population, year",
-            filters={"continent_code": code},
-        )
-        trade_row = get_table_row(
-            "continent_trade",
-            "exports_usd, imports_usd, trade_balance_usd, year",
-            filters={"continent_code": code},
-        )
-        gdp_per_capita_row = get_table_row(
-            "continent_gdp_per_capita",
-            "gdp_per_capita_usd, year",
-            filters={"continent_code": code},
-        )
+        gdp_row = gdp_rows.get(code)
+        pop_row = population_rows.get(code)
+        trade_row = trade_rows.get(code)
+        gdp_per_capita_row = gdp_per_capita_rows.get(code)
 
         start_year = int(gdp_row["year"]) + 1 if gdp_row and gdp_row.get("year") else utc_year()
         pop_start_year = int(pop_row["year"]) + 1 if pop_row and pop_row.get("year") else utc_year()
 
-        growth_row = get_table_row(
-            "continent_real_gdp_growth",
-            "real_growth" + (", year" if growth_has_year else ""),
-            filters={"continent_code": code},
-            preferred_year=start_year,
-        )
-        inflation_row = get_table_row(
-            "continent_inflation",
-            "inflation" + (", year" if inflation_has_year else ""),
-            filters={"continent_code": code},
-            preferred_year=start_year,
-        )
-        pop_growth_row = get_table_row(
-            "continent_population_growth",
-            "growth_rate" + (", year" if pop_growth_has_year else ""),
-            filters={"continent_code": code},
-            preferred_year=pop_start_year,
-        )
-        share_row = get_table_row(
-            "continent_world_gdp_share",
-            "pct_of_world" + (", year" if share_has_year else ""),
-            filters={"continent_code": code},
-            preferred_year=gdp_row["year"] if gdp_row and gdp_row.get("year") else None,
-        )
+        growth_row = growth_rows.get(code)
+        inflation_row = inflation_rows.get(code)
+        pop_growth_row = pop_growth_rows.get(code)
+        share_row = share_rows.get(code)
 
         real_growth = clean_number(growth_row.get("real_growth") if growth_row else 0)
         inflation = clean_number(inflation_row.get("inflation") if inflation_row else 0)
@@ -229,16 +237,26 @@ def get_continent_detail(continent_code):
 
     top_countries = []
     if table_has_column("continent_country_gdp_share", "continent_code"):
-        top_countries = fetch_all(
+        latest_year_row = fetch_one(
             """
-            SELECT country, gdp, pct_of_continent, year
+            SELECT MAX(year) AS year
             FROM continent_country_gdp_share
             WHERE continent_code = %s
-            ORDER BY year DESC, gdp DESC
-            LIMIT 7
             """,
             (continent_code,),
         )
+        latest_year = latest_year_row.get("year") if latest_year_row else None
+        if latest_year:
+            top_countries = fetch_all(
+                """
+                SELECT country, gdp, pct_of_continent, year
+                FROM continent_country_gdp_share
+                WHERE continent_code = %s AND year = %s
+                ORDER BY gdp DESC
+                LIMIT 7
+                """,
+                (continent_code, latest_year),
+            )
 
     if not top_countries:
         top_countries = fetch_all(

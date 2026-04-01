@@ -1,3 +1,7 @@
+from functools import lru_cache
+
+
+@lru_cache(maxsize=256)
 def get_rate_by_country_name(country_name):
     try:
         import requests
@@ -9,7 +13,7 @@ def get_rate_by_country_name(country_name):
             return None, None
 
         currency_code = currencies[0]
-        response = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=5)
+        response = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=2)
         response.raise_for_status()
         rate = response.json().get("rates", {}).get(currency_code)
         return rate, currency_code

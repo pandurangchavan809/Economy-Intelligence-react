@@ -120,27 +120,26 @@ def get_country_trade(country_id):
     )
 
 
-def get_country_shares(country_id, iso3, continent_code, year):
+def get_country_shares(country_id, country_name, iso3, continent_code, year):
     share_of_continent = None
     share_of_world = None
 
-    if table_has_column("country_continent_gdp_share", "pct_of_continent"):
-        if iso3 and table_has_column("country_continent_gdp_share", "iso3"):
-            row = fetch_one(
-                """
-                SELECT pct_of_continent
-                FROM country_continent_gdp_share
-                WHERE iso3 = %s AND year = %s
-                LIMIT 1
-                """,
-                (iso3, year),
-            )
-            if row:
-                share_of_continent = clean_number(row["pct_of_continent"])
+    try:
+        if table_has_column("country_continent_gdp_share", "pct_of_continent"):
+            if iso3 and table_has_column("country_continent_gdp_share", "iso3"):
+                row = fetch_one(
+                    """
+                    SELECT pct_of_continent
+                    FROM country_continent_gdp_share
+                    WHERE iso3 = %s AND year = %s
+                    LIMIT 1
+                    """,
+                    (iso3, year),
+                )
+                if row:
+                    share_of_continent = clean_number(row["pct_of_continent"])
 
-        if share_of_continent is None:
-            country_row = fetch_one("SELECT name FROM countries WHERE country_id = %s LIMIT 1", (country_id,))
-            if country_row:
+            if share_of_continent is None and country_name:
                 row = fetch_one(
                     """
                     SELECT pct_of_continent
@@ -148,28 +147,26 @@ def get_country_shares(country_id, iso3, continent_code, year):
                     WHERE country = %s AND year = %s
                     LIMIT 1
                     """,
-                    (country_row["name"], year),
+                    (country_name, year),
                 )
                 if row:
                     share_of_continent = clean_number(row["pct_of_continent"])
 
-    if table_has_column("country_world_gdp_share", "pct_of_world"):
-        if iso3 and table_has_column("country_world_gdp_share", "iso3"):
-            row = fetch_one(
-                """
-                SELECT pct_of_world
-                FROM country_world_gdp_share
-                WHERE iso3 = %s AND year = %s
-                LIMIT 1
-                """,
-                (iso3, year),
-            )
-            if row:
-                share_of_world = clean_number(row["pct_of_world"])
+        if table_has_column("country_world_gdp_share", "pct_of_world"):
+            if iso3 and table_has_column("country_world_gdp_share", "iso3"):
+                row = fetch_one(
+                    """
+                    SELECT pct_of_world
+                    FROM country_world_gdp_share
+                    WHERE iso3 = %s AND year = %s
+                    LIMIT 1
+                    """,
+                    (iso3, year),
+                )
+                if row:
+                    share_of_world = clean_number(row["pct_of_world"])
 
-        if share_of_world is None:
-            country_row = fetch_one("SELECT name FROM countries WHERE country_id = %s LIMIT 1", (country_id,))
-            if country_row:
+            if share_of_world is None and country_name:
                 row = fetch_one(
                     """
                     SELECT pct_of_world
@@ -177,57 +174,59 @@ def get_country_shares(country_id, iso3, continent_code, year):
                     WHERE country = %s AND year = %s
                     LIMIT 1
                     """,
-                    (country_row["name"], year),
+                    (country_name, year),
                 )
                 if row:
                     share_of_world = clean_number(row["pct_of_world"])
 
-    if share_of_continent is None or share_of_world is None:
-        gdp_row = fetch_one(
-            """
-            SELECT gdp
-            FROM economic_indicators
-            WHERE country_id = %s AND year = %s
-            LIMIT 1
-            """,
-            (country_id, year),
-        ) or fetch_one(
-            """
-            SELECT gdp, year
-            FROM economic_indicators
-            WHERE country_id = %s AND gdp IS NOT NULL
-            ORDER BY year DESC
-            LIMIT 1
-            """,
-            (country_id,),
-        )
-
-        country_gdp = clean_number(gdp_row["gdp"]) if gdp_row else None
-
-        if share_of_continent is None and country_gdp is not None and continent_code:
-            continent_row = fetch_one(
+        if share_of_continent is None or share_of_world is None:
+            gdp_row = fetch_one(
                 """
-                SELECT gdp_usd
-                FROM continent_nominal_gdp
-                WHERE continent_code = %s AND year = %s
+                SELECT gdp
+                FROM economic_indicators
+                WHERE country_id = %s AND year = %s
                 LIMIT 1
                 """,
-                (continent_code, year),
-            )
-            if continent_row and continent_row.get("gdp_usd"):
-                share_of_continent = country_gdp / (float(continent_row["gdp_usd"]) * 1e9) * 100
-
-        if share_of_world is None and country_gdp is not None:
-            world_row = fetch_one(
+                (country_id, year),
+            ) or fetch_one(
                 """
-                SELECT SUM(gdp_usd) AS world_sum_billion
-                FROM continent_nominal_gdp
-                WHERE year = %s
+                SELECT gdp, year
+                FROM economic_indicators
+                WHERE country_id = %s AND gdp IS NOT NULL
+                ORDER BY year DESC
+                LIMIT 1
                 """,
-                (year,),
+                (country_id,),
             )
-            if world_row and world_row.get("world_sum_billion"):
-                share_of_world = country_gdp / (float(world_row["world_sum_billion"]) * 1e9) * 100
+
+            country_gdp = clean_number(gdp_row["gdp"]) if gdp_row else None
+
+            if share_of_continent is None and country_gdp is not None and continent_code:
+                continent_row = fetch_one(
+                    """
+                    SELECT gdp_usd
+                    FROM continent_nominal_gdp
+                    WHERE continent_code = %s AND year = %s
+                    LIMIT 1
+                    """,
+                    (continent_code, year),
+                )
+                if continent_row and continent_row.get("gdp_usd"):
+                    share_of_continent = country_gdp / (float(continent_row["gdp_usd"]) * 1e9) * 100
+
+            if share_of_world is None and country_gdp is not None:
+                world_row = fetch_one(
+                    """
+                    SELECT SUM(gdp_usd) AS world_sum_billion
+                    FROM continent_nominal_gdp
+                    WHERE year = %s
+                    """,
+                    (year,),
+                )
+                if world_row and world_row.get("world_sum_billion"):
+                    share_of_world = country_gdp / (float(world_row["world_sum_billion"]) * 1e9) * 100
+    except Exception:
+        return None, None
 
     return share_of_continent, share_of_world
 
@@ -274,6 +273,7 @@ def get_country_detail(country_id):
 
     share_of_continent, share_of_world = get_country_shares(
         country_id,
+        meta.get("name"),
         meta.get("iso3"),
         meta.get("continent_code"),
         indicator_year or utc_year(),
