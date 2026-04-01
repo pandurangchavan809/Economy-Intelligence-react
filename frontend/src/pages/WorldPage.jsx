@@ -34,13 +34,13 @@ export default function WorldPage() {
           label="Live GDP"
           value={liveGdp ? formatTrillions(liveGdp, 6) : "Loading..."}
           hint="Current USD, updated every second"
-          valueClassName="text-[clamp(1.3rem,2vw,2.45rem)] leading-[1.05] tracking-tight"
+          valueClassName="text-[clamp(1.15rem,1.7vw,2.1rem)] leading-[1.05] tracking-tight"
         />
         <MetricCard
           label="Population"
           value={livePopulation ? formatNumber(livePopulation) : "Loading..."}
           hint="Live estimate from stored growth rate"
-          valueClassName="text-[clamp(1.3rem,1.95vw,2.35rem)] leading-[1.05] tracking-tight"
+          valueClassName="text-[clamp(1.1rem,1.65vw,2rem)] leading-[1.05] tracking-tight"
         />
         <MetricCard
           label="GDP Per Capita"

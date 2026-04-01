@@ -76,13 +76,13 @@ export default function ContinentsPage() {
           label="Live GDP"
           value={liveGdp ? formatTrillions(liveGdp, 5) : "Loading..."}
           hint={selectedContinent ? selectedContinent.name : "Select a continent"}
-          valueClassName="text-[clamp(1.25rem,1.9vw,2.35rem)] leading-[1.05] tracking-tight"
+          valueClassName="text-[clamp(1.1rem,1.55vw,1.95rem)] leading-[1.05] tracking-tight"
         />
         <MetricCard
           label="Population"
           value={livePopulation ? formatNumber(livePopulation) : "Loading..."}
           hint="Live estimate"
-          valueClassName="text-[clamp(1.2rem,1.85vw,2.2rem)] leading-[1.05] tracking-tight"
+          valueClassName="text-[clamp(1rem,1.45vw,1.8rem)] leading-[1.05] tracking-tight"
         />
         <MetricCard
           label="Share of World"
