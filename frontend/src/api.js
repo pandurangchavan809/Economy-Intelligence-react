@@ -1,7 +1,18 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 const CACHE_PREFIX = "economy-api-cache:";
-const DEFAULT_TTL_MS = 5 * 60 * 1000;
+const DEFAULT_TTL_MS = 60 * 60 * 1000;
+const MAX_CACHE_SIZE = 100;
 const memoryCache = new Map();
+
+function getStorage() {
+  if (typeof window === "undefined") return null;
+
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 function buildCacheKey(path, token) {
   return `${token ? `auth:${token}` : "public"}:${path}`;
@@ -11,20 +22,38 @@ function isValidEntry(entry) {
   return Boolean(entry && entry.expiresAt && entry.expiresAt > Date.now());
 }
 
+function enforceCacheLimit() {
+  while (memoryCache.size > MAX_CACHE_SIZE) {
+    const oldestKey = memoryCache.keys().next().value;
+    if (!oldestKey) break;
+    memoryCache.delete(oldestKey);
+  }
+}
+
+function rememberEntry(cacheKey, entry) {
+  if (memoryCache.has(cacheKey)) {
+    memoryCache.delete(cacheKey);
+  }
+
+  memoryCache.set(cacheKey, entry);
+  enforceCacheLimit();
+}
+
 function readStorageEntry(cacheKey) {
-  if (typeof window === "undefined") return null;
+  const storage = getStorage();
+  if (!storage) return null;
 
   try {
-    const raw = window.sessionStorage.getItem(`${CACHE_PREFIX}${cacheKey}`);
+    const raw = storage.getItem(`${CACHE_PREFIX}${cacheKey}`);
     if (!raw) return null;
 
     const entry = JSON.parse(raw);
     if (isValidEntry(entry)) {
-      memoryCache.set(cacheKey, entry);
+      rememberEntry(cacheKey, entry);
       return entry;
     }
 
-    window.sessionStorage.removeItem(`${CACHE_PREFIX}${cacheKey}`);
+    storage.removeItem(`${CACHE_PREFIX}${cacheKey}`);
   } catch {
     return null;
   }
@@ -38,11 +67,12 @@ function writeCacheEntry(cacheKey, data, ttlMs) {
     expiresAt: Date.now() + ttlMs
   };
 
-  memoryCache.set(cacheKey, entry);
+  rememberEntry(cacheKey, entry);
 
-  if (typeof window !== "undefined") {
+  const storage = getStorage();
+  if (storage) {
     try {
-      window.sessionStorage.setItem(`${CACHE_PREFIX}${cacheKey}`, JSON.stringify(entry));
+      storage.setItem(`${CACHE_PREFIX}${cacheKey}`, JSON.stringify(entry));
     } catch {
       // Ignore storage write failures and keep the in-memory cache.
     }
@@ -66,15 +96,16 @@ export function clearApiCache(prefix = "") {
     }
   }
 
-  if (typeof window !== "undefined") {
+  const storage = getStorage();
+  if (storage) {
     try {
-      for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
-        const storageKey = window.sessionStorage.key(index);
+      for (let index = storage.length - 1; index >= 0; index -= 1) {
+        const storageKey = storage.key(index);
         if (!storageKey?.startsWith(CACHE_PREFIX)) continue;
 
         const cacheKey = storageKey.slice(CACHE_PREFIX.length);
         if (matchesPrefix(cacheKey)) {
-          window.sessionStorage.removeItem(storageKey);
+          storage.removeItem(storageKey);
         }
       }
     } catch {
