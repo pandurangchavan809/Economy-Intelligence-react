@@ -1,3 +1,5 @@
+Live Deployment: [https://economic-intelligence.vercel.app](https://economic-intelligence.vercel.app)
+
 # Economy Intelligence
 
 Economy Intelligence is a full-stack web application for viewing world, continent, and country economic metrics, running authenticated admin database operations, and generating AI-based country analysis.
